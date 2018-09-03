@@ -147,6 +147,16 @@ export interface User {
   customData?: any;
 }
 
+export interface SendMessageOptions {
+  sender_id: string;
+  room_id: string;
+  text: string;
+  attachment?: {
+    resource_link: string;
+    type: 'image' | 'video' | 'audio' | 'file';
+  }
+}
+
 const TOKEN_EXPIRY_LEEWAY = 30;
 
 export default class Chatkit {
@@ -550,6 +560,65 @@ export default class Chatkit {
       method: 'GET',
       path: `/roles`,
       jwt: this.getServerToken(),
+    }).then((res) => {
+      return JSON.parse(res.body);
+    })
+  }
+
+  sendMessage(options: SendMessageOptions): Promise<any> {
+    if (typeof options.sender_id === typeof undefined) {
+        throw new Error('You must provide the ID of the user that you want to set as the sender of the message');
+    }
+    if (typeof options.room_id === typeof undefined) {
+        throw new Error('You must provide the ID of the room that you want to add the message to');
+    }
+    if (typeof options.text === typeof undefined) {
+        throw new Error('You must provide some text for the message');
+    }
+    const user_id = options.sender_id;
+    const room_id = options.room_id;
+
+    interface Body {
+      text: string;
+      attachment?: {
+        resource_link: string;
+        type: 'image' | 'video' | 'audio' | 'file'
+      }
+    }
+    const body: Body = {
+      text: options.text
+    };
+
+    if (typeof options.attachment !== typeof undefined) {
+      if (!options.attachment || typeof options.attachment.resource_link === typeof undefined) {
+        console.error(options.attachment);
+        throw new Error('You must provide the resource_link for the attachment');
+      }
+      if (!options.attachment || typeof options.attachment.type === typeof undefined
+        || !(['image', 'video', 'audio', 'file'].filter(t => options.attachment && t === options.attachment.type).length ? true : false) ) {
+        throw new Error('You must provide the type for the attachment. This can be one of image, video, audio or file');
+      }
+      if (options.attachment) {
+        body.attachment = {
+          resource_link: options.attachment.resource_link,
+          type: options.attachment.type
+        };
+      }
+    }
+
+    const jwt = this.generateAccessToken({
+      su: true,
+      userId: options.sender_id,
+    });
+
+    return this.apiInstance.request({
+      method: 'POST',
+      path: `/rooms/${options.room_id}/messages`,
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: body,
+      jwt: jwt.token,
     }).then((res) => {
       return JSON.parse(res.body);
     })
