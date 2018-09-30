@@ -116,6 +116,15 @@ export interface User {
     avatarURL?: string;
     customData?: any;
 }
+export interface SendMessageOptions {
+    senderId: string;
+    roomId: string;
+    text: string;
+    attachment?: {
+        resourceLink: string;
+        type: 'image' | 'video' | 'audio' | 'file';
+    };
+}
 export default class Chatkit {
     apiInstance: Instance;
     authorizerInstance: Instance;
@@ -155,6 +164,12 @@ export default class Chatkit {
     apiRequest(options: GeneralRequestOptions): Promise<any>;
     authorizerRequest(options: GeneralRequestOptions): Promise<any>;
     private updatePermissionsForRole(roleName, scope, permissionsToadd?, permissionsToRemove?);
+    sendMessage(options: SendMessageOptions, jwtToken?: TokenWithExpiry | null, autoJwt?: boolean): Promise<any>;
+    /**
+     * This method manages the token for http library and pusher platform
+     * communication
+     */
+    private getToken(jwt);
     /**
      * This method manages the token for http library and pusher platform
      * communication

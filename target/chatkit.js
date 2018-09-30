@@ -397,6 +397,76 @@ var Chatkit = /** @class */ (function () {
             jwt: this.getServerToken(),
         }).then(function () { });
     };
+    Chatkit.prototype.sendMessage = function (options, jwtToken, autoJwt) {
+        if (jwtToken === void 0) { jwtToken = null; }
+        if (autoJwt === void 0) { autoJwt = false; }
+        if (typeof options.senderId === typeof undefined) {
+            throw new Error('You must provide the ID of the user that you want to set as the sender of the message');
+        }
+        if (typeof options.roomId === typeof undefined) {
+            throw new Error('You must provide the ID of the room that you want to add the message to');
+        }
+        if (typeof options.text === typeof undefined) {
+            throw new Error('You must provide some text for the message');
+        }
+        var body = {
+            text: options.text
+        };
+        if (typeof options.attachment !== typeof undefined && options.attachment) {
+            if (typeof options.attachment.resourceLink === typeof undefined) {
+                throw new Error('You must provide the resource_link for the attachment');
+            }
+            if (typeof options.attachment.type === typeof undefined
+                || !(['image', 'video', 'audio', 'file'].indexOf(options.attachment.type) > -1)) {
+                throw new Error('You must provide the type for the attachment. This can be one of image, video, audio or file');
+            }
+            if (options.attachment) {
+                body.attachment = {
+                    resource_link: options.attachment.resourceLink,
+                    type: options.attachment.type
+                };
+            }
+        }
+        var requestOptions = {
+            method: 'POST',
+            path: "/rooms/" + options.roomId + "/messages",
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: body
+        };
+        if (jwtToken === null && !autoJwt) {
+            throw new Error('Your request can\'t be authenticated. Pass correct JWT token or use auto option.');
+        }
+        // If auto is false and token provided
+        if (jwtToken !== null && !autoJwt) {
+            requestOptions.jwt = this.getToken(jwtToken);
+        }
+        // Override JWT token if auto set to true
+        if (autoJwt) {
+            var jwt = this.generateAccessToken({
+                su: true,
+                userId: options.senderId,
+            });
+            requestOptions.jwt = jwt.token;
+        }
+        return this.apiInstance.request(requestOptions).then(function (res) {
+            return JSON.parse(res.body);
+        });
+    };
+    /**
+     * This method manages the token for http library and pusher platform
+     * communication
+     */
+    Chatkit.prototype.getToken = function (jwt) {
+        if (jwt && jwt.expires_in > utils_1.getCurrentTimeInSeconds()) {
+            return jwt.token;
+        }
+        else {
+            throw new Error("JWT token expired " + jwt.expires_in + ".");
+        }
+    };
+    ;
     /**
      * This method manages the token for http library and pusher platform
      * communication
