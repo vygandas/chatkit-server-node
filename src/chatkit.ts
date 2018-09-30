@@ -9,6 +9,7 @@ import {
 } from 'pusher-platform-node';
 
 import { getCurrentTimeInSeconds } from './utils';
+import { RequestOptions } from 'pusher-platform-node/target/common';
 
 export interface AuthenticationOptions {
   userId: string;
@@ -145,6 +146,16 @@ export interface User {
   name: string;
   avatarURL?: string;
   customData?: any;
+}
+
+export interface SendMessageOptions {
+  senderId: string;
+  roomId: string;
+  text: string;
+  attachment?: {
+    resourceLink: string;
+    type: 'image' | 'video' | 'audio' | 'file';
+  }
 }
 
 const TOKEN_EXPIRY_LEEWAY = 30;
@@ -600,6 +611,88 @@ export default class Chatkit {
     }).then(() => {})
   }
 
+  sendMessage(options: SendMessageOptions, jwtToken: TokenWithExpiry | null = null, autoJwt: boolean = false): Promise<any> {
+    if (typeof options.senderId === typeof undefined) {
+        throw new Error('You must provide the ID of the user that you want to set as the sender of the message');
+    }
+    if (typeof options.roomId === typeof undefined) {
+        throw new Error('You must provide the ID of the room that you want to add the message to');
+    }
+    if (typeof options.text === typeof undefined) {
+        throw new Error('You must provide some text for the message');
+    }
+
+    interface Body {
+      text: string;
+      attachment?: {
+        resource_link: string;
+        type: 'image' | 'video' | 'audio' | 'file';
+      }
+    }
+
+    const body: Body = {
+      text: options.text
+    };
+
+    if (typeof options.attachment !== typeof undefined && options.attachment) {
+      if (typeof options.attachment.resourceLink === typeof undefined) {
+        throw new Error('You must provide the resource_link for the attachment');
+      }
+      if (typeof options.attachment.type === typeof undefined
+        || !(['image', 'video', 'audio', 'file'].indexOf(options.attachment.type) > -1) ) {
+        throw new Error('You must provide the type for the attachment. This can be one of image, video, audio or file');
+      }
+      if (options.attachment) {
+        body.attachment = {
+          resource_link: options.attachment.resourceLink,
+          type: options.attachment.type
+        };
+      }
+    }
+
+    const requestOptions: RequestOptions = {
+      method: 'POST',
+      path: `/rooms/${options.roomId}/messages`,
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: body
+    };
+
+    if (jwtToken === null && !autoJwt) {
+      throw new Error('Your request can\'t be authenticated. Pass correct JWT token or use auto option.');
+    }
+
+    // If auto is false and token provided
+    if (jwtToken !== null && !autoJwt) {
+      requestOptions.jwt = this.getToken(jwtToken);
+    }
+
+    // Override JWT token if auto set to true
+    if (autoJwt) {
+      const jwt = this.generateAccessToken({
+        su: true,
+        userId: options.senderId,
+      });
+      requestOptions.jwt = jwt.token;
+    }
+
+    return this.apiInstance.request(requestOptions).then((res) => {
+      return JSON.parse(res.body);
+    })
+  }
+
+  /**
+   * This method manages the token for http library and pusher platform
+   * communication
+   */
+  private getToken(jwt: TokenWithExpiry): string {
+    if (jwt && jwt.expires_in > getCurrentTimeInSeconds()) {
+      return jwt.token;
+    } else {
+      throw new Error(`JWT token expired ${jwt.expires_in}.`);
+    }
+  };
 
   /**
    * This method manages the token for http library and pusher platform
